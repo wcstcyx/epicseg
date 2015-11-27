@@ -67,10 +67,64 @@ avgStateProfile <- function(genes, segm, nstates, before=200, after=200, reflen=
     colnames(mat) <- 1:npos - before
     
     #sort the row names
-    mat <- mat[as.character(1:nstates),]
+    mat <- mat[as.character(1:nstates),,drop=FALSE]
     
     mat
 }
+
+
+
+#get how many inches are needed for plotting the legend (horizontal, vertical)
+#get also the right number of columns
+getLegendSize <- function(labels, dev, profWidth=7, profHeight=7){
+    #to get some R parameters we need to open and close the device...
+    openDevice(dev, Win=profWidth, Hin=profHeight)
+    plot(c(1,2,3))
+    usr <- par("usr")
+    #determine the number of columns
+    for (nc in 1:length(labels)){
+        l <- legend("right", legend=labels, lty=1, ncol=nc)
+        if (l$rect$top <= usr[2] && l$rect$top-l$rect$h >= usr[1]) break
+    }
+    ans <- usr2in(c(l$rect$w, l$rect$h))
+    dev.off()
+    c(ans, nc)
+}
+
+#from width in user coordinates to width in inches
+usr2in <- function(usize){
+    #get total user width
+    usr <- matrix(par("usr"), nrow=2)
+    utot <- apply(usr,2,diff)
+    #get total user width in inches
+    pin <- par("pin")
+    usize*pin/utot
+}
+
+plotProfileAndLegend2Dev <- function(mat, colors, dev=NULL, legend.bg=par("bg"), lwd=par("lwd"), profWidth=7, profHeight=7, ...){
+    if (is.null(rownames(mat))) rownames(mat) <- 1:nrow(mat)
+    labels <- rownames(mat)
+    lsize <- getLegendSize(labels, dev, profWidth=profWidth, profHeight=profHeight)
+    lWidth <- lsize[1]
+    #cat("legend width ", lWidth, "\n")
+    openDevice(dev, Win=(profWidth + lWidth), Hin=profHeight)
+    #make the right margin large enough
+    mai <- par("mai"); spacer <- mai[4]/2
+    mai[4] <- mai[4] + lWidth
+    par(mai=mai)
+    #plot profile
+    plotProfile(mat, legend=F, lwd=lwd, colors=colors, ...)
+    #find out the inset
+    pin <- par("pin")
+    #width in inches of the user coordinates
+    pwidth <- pin[1]
+    inset <- -(lWidth+spacer)/pwidth
+    prova <- legend("right", legend=gsub("_", " ", rownames(mat)), col=colors, lty=1, lwd=lwd, xpd=NA, inset=inset, ncol=lsize[3])
+    #cat("legend width ", usr2in(c(prova$rect$w, prova$rect$h)), "\n")
+    
+    if (!is.null(dev)) dev.off()
+}
+
 
 plotProfile <- function(mat, colors, legend.pos="top", xlab="offset", 
     ylab="number of regions", main="average state profile", xlim=range(xs), 
@@ -102,6 +156,7 @@ plotProfile <- function(mat, colors, legend.pos="top", xlab="offset",
 
 #clustmeans is a matrix where the columns are clusters and the rows are marks
 #the rows must be named.
+#this function is not used anymore...
 automaticColoring <- function(clustmeans, markToCol=list(red="H3K4me3", green4="H3K36me3", blue=c("H3K9me3", "H3K27me3"), gold="H3K4me1")){
     nstates <- ncol(clustmeans)
     if (is.null(rownames(clustmeans))) {
